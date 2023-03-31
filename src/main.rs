@@ -1,10 +1,13 @@
-use actix_web::{middleware, web, App, HttpRequest, HttpServer, Responder, Result};
+use actix_web::{web, App, HttpRequest, HttpServer, Responder, Result};
 use base64::{engine::general_purpose::STANDARD as b64engine, Engine as _};
-use env_logger::Env;
+use log::info;
+use logging::init_logger;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
+mod logging;
 
 #[derive(Debug, Default, PartialEq, Serialize, Deserialize)]
 struct ClientInfo {
@@ -42,14 +45,16 @@ async fn handler(
     bytes: web::Bytes,
     query: web::Query<HashMap<String, String>>,
 ) -> Result<impl Responder> {
+    let method = req.method();
+    let path = req.path();
     let client_info = get_client(&req);
     let url_info = get_url_info(&req);
     let headers = get_headers(&req);
     let body = get_body(bytes);
 
     let resp = CatchallResponse {
-        method: req.method().to_string(),
-        path: req.path().to_string(),
+        method: method.to_string(),
+        path: path.to_string(),
         client: client_info,
         url: url_info,
         headers,
@@ -57,9 +62,14 @@ async fn handler(
         body,
     };
 
-    let resp = web::Json(resp);
+    info!(
+        "{} {}\n{}",
+        method,
+        path,
+        serde_json::to_string_pretty(&resp).expect("Error dumping resp to json")
+    );
 
-    println!("{:?}", resp);
+    let resp = web::Json(resp);
 
     Ok(resp)
 }
@@ -118,14 +128,13 @@ fn configure_app(cfg: &mut web::ServiceConfig) {
             .route(web::get().to(handler))
             .route(web::patch().to(handler))
             .route(web::post().to(handler))
-            .route(web::put().to(handler))
-            .wrap(middleware::Logger::default()),
+            .route(web::put().to(handler)),
     );
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    env_logger::init_from_env(Env::default().default_filter_or("info"));
+    init_logger();
 
     HttpServer::new(|| App::new().configure(configure_app))
         .workers(2)
