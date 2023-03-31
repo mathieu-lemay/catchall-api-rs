@@ -2,6 +2,7 @@ use actix_web::{middleware, web, App, HttpRequest, HttpServer, Responder, Result
 use base64::{engine::general_purpose::STANDARD as b64engine, Engine as _};
 use env_logger::Env;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
@@ -21,6 +22,7 @@ struct UrlInfo {
 
 #[derive(Debug, Default, PartialEq, Serialize, Deserialize)]
 struct Body {
+    json: Option<Value>,
     raw: String,
 }
 
@@ -103,9 +105,10 @@ fn get_headers(request: &HttpRequest) -> HashMap<String, String> {
 }
 
 fn get_body(bytes: web::Bytes) -> Body {
+    let json: Option<Value> = serde_json::from_slice(&bytes).ok();
     let raw = b64engine.encode(bytes);
 
-    Body { raw }
+    Body { json, raw }
 }
 
 fn configure_app(cfg: &mut web::ServiceConfig) {
@@ -138,7 +141,7 @@ mod tests {
     use actix_web::{
         body::BoxBody,
         dev::{Service, ServiceResponse},
-        http::header::X_FORWARDED_FOR,
+        http::header::{ContentType, X_FORWARDED_FOR},
         test,
     };
 
@@ -288,6 +291,35 @@ mod tests {
     }
 
     #[actix_web::test]
+    async fn test_handler_returns_json_body() {
+        let app = get_test_app().await;
+
+        let payload = "{\"foo\": \"bar\"}";
+
+        let resp = test::TestRequest::post()
+            .uri("/")
+            .set_payload(payload)
+            .insert_header(ContentType::json())
+            .send_request(&app)
+            .await;
+
+        assert!(resp.status().is_success());
+
+        let body: CatchallResponse = test::read_body_json(resp).await;
+
+        let expected_json: Value = serde_json::from_str(payload).expect("Malformed json");
+        let expected_raw = "eyJmb28iOiAiYmFyIn0=".to_string();
+
+        assert_eq!(
+            body.body,
+            Body {
+                json: Some(expected_json),
+                raw: expected_raw
+            }
+        );
+    }
+
+    #[actix_web::test]
     async fn test_handler_returns_text_raw_body_as_base64() {
         let app = get_test_app().await;
 
@@ -301,7 +333,13 @@ mod tests {
 
         let body: CatchallResponse = test::read_body_json(resp).await;
 
-        assert_eq!(body.body.raw, "Zm9vYmFy");
+        assert_eq!(
+            body.body,
+            Body {
+                json: None,
+                raw: "Zm9vYmFy".to_string()
+            }
+        );
     }
 
     #[actix_web::test]
@@ -322,8 +360,11 @@ mod tests {
         let body: CatchallResponse = test::read_body_json(resp).await;
 
         assert_eq!(
-            body.body.raw,
-            "I8pLXnswbLXgIx7irOJ9y8nOWFOsybxgHvQsQQbHh10="
+            body.body,
+            Body {
+                json: None,
+                raw: "I8pLXnswbLXgIx7irOJ9y8nOWFOsybxgHvQsQQbHh10=".to_string()
+            }
         );
     }
 }
