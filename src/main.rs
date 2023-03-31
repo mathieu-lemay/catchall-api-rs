@@ -10,10 +10,19 @@ struct ClientInfo {
 }
 
 #[derive(Debug, Default, PartialEq, Serialize, Deserialize)]
+struct UrlInfo {
+    scheme: String,
+    hostname: String,
+    port: u16,
+    path: String,
+}
+
+#[derive(Debug, Default, PartialEq, Serialize, Deserialize)]
 struct CatchallResponse {
     method: String,
     path: String,
     client: ClientInfo,
+    url: UrlInfo,
     query_params: HashMap<String, String>,
 }
 
@@ -22,11 +31,13 @@ async fn handler(
     query: web::Query<HashMap<String, String>>,
 ) -> Result<impl Responder> {
     let client_info = get_client(&req);
+    let url_info = get_url_info(&req);
 
     let resp = CatchallResponse {
         method: req.method().to_string(),
         path: req.path().to_string(),
         client: client_info,
+        url: url_info,
         query_params: query.0,
     };
 
@@ -50,6 +61,25 @@ fn get_client(request: &HttpRequest) -> ClientInfo {
     ClientInfo {
         remote_ip: conn_info.realip_remote_addr().map(|s| s.to_string()),
         port,
+    }
+}
+
+fn get_url_info(request: &HttpRequest) -> UrlInfo {
+    let conn_info = request.connection_info();
+
+    let host = conn_info.host();
+    let hostname = host.split(':').next().unwrap_or("").to_string();
+    let port = host
+        .split(':')
+        .nth(1)
+        .map(|p| p.parse::<u16>().unwrap_or(0))
+        .unwrap_or(0);
+
+    UrlInfo {
+        scheme: conn_info.scheme().to_string(),
+        hostname,
+        port,
+        path: request.path().to_string(),
     }
 }
 
@@ -108,8 +138,14 @@ mod tests {
             method: "GET".to_string(),
             path: "/".to_string(),
             client: ClientInfo {
-                remote_ip: Some("192.168.42.69".into()),
+                remote_ip: Some("192.168.42.69".to_string()),
                 port: 8080,
+            },
+            url: UrlInfo {
+                scheme: "http".to_string(),
+                hostname: "localhost".to_string(),
+                port: 8080,
+                path: "/".to_string(),
             },
             ..Default::default()
         };
@@ -177,7 +213,7 @@ mod tests {
 
         let body: CatchallResponse = test::read_body_json(resp).await;
 
-        assert_eq!(body.client.remote_ip, Some(ip.into()));
+        assert_eq!(body.client.remote_ip, Some(ip.to_string()));
     }
 
     #[actix_web::test]
