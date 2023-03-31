@@ -305,8 +305,8 @@ version = "0.1.0"
 dependencies = [
  "actix-http",
  "actix-web",
+ "base64",
  "env_logger",
- "parameterized",
  "serde",
 ]
 
@@ -742,27 +742,6 @@ name = "once_cell"
 version = "1.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b7e5500299e16ebb147ae15a00a942af264cf3688f47923b8fc2cd5858f23ad3"
-
-[[package]]
-name = "parameterized"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bae5c87ace1829bb3dcbadaf9d099c62beb05ca19ab4b26389eaa33ced9db11b"
-dependencies = [
- "parameterized-macro",
-]
-
-[[package]]
-name = "parameterized-macro"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1def6e0adb9bf9daf2d352cba8407b5eaa204f77e02de149ad690e816d7fac14"
-dependencies = [
- "indexmap",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
 
 [[package]]
 name = "parking_lot"

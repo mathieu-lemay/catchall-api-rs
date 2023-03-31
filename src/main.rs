@@ -1,4 +1,5 @@
 use actix_web::{middleware, web, App, HttpRequest, HttpServer, Responder, Result};
+use base64::{engine::general_purpose::STANDARD as b64engine, Engine as _};
 use env_logger::Env;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -19,6 +20,11 @@ struct UrlInfo {
 }
 
 #[derive(Debug, Default, PartialEq, Serialize, Deserialize)]
+struct Body {
+    raw: String,
+}
+
+#[derive(Debug, Default, PartialEq, Serialize, Deserialize)]
 struct CatchallResponse {
     method: String,
     path: String,
@@ -26,15 +32,18 @@ struct CatchallResponse {
     url: UrlInfo,
     headers: HashMap<String, String>,
     query_params: HashMap<String, String>,
+    body: Body,
 }
 
 async fn handler(
     req: HttpRequest,
+    bytes: web::Bytes,
     query: web::Query<HashMap<String, String>>,
 ) -> Result<impl Responder> {
     let client_info = get_client(&req);
     let url_info = get_url_info(&req);
     let headers = get_headers(&req);
+    let body = get_body(bytes);
 
     let resp = CatchallResponse {
         method: req.method().to_string(),
@@ -43,6 +52,7 @@ async fn handler(
         url: url_info,
         headers,
         query_params: query.0,
+        body,
     };
 
     let resp = web::Json(resp);
@@ -90,6 +100,12 @@ fn get_headers(request: &HttpRequest) -> HashMap<String, String> {
         .iter()
         .map(|(n, v)| (n.to_string(), v.to_str().unwrap_or("").to_string()))
         .collect()
+}
+
+fn get_body(bytes: web::Bytes) -> Body {
+    let raw = b64engine.encode(bytes);
+
+    Body { raw }
 }
 
 fn configure_app(cfg: &mut web::ServiceConfig) {
@@ -228,7 +244,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_handler_returns_headers() {
-        let app = test::init_service(App::new().configure(configure_app)).await;
+        let app = get_test_app().await;
 
         let resp = test::TestRequest::get()
             .uri("/")
@@ -252,7 +268,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_handler_returns_query_params() {
-        let app = test::init_service(App::new().configure(configure_app)).await;
+        let app = get_test_app().await;
 
         let resp = test::TestRequest::get()
             .uri("/?foo=bar&baz=69")
@@ -268,5 +284,45 @@ mod tests {
         expected.insert("baz".to_string(), "69".to_string());
 
         assert_eq!(body.query_params, expected);
+    }
+
+    #[actix_web::test]
+    async fn test_handler_returns_text_raw_body_as_base64() {
+        let app = get_test_app().await;
+
+        let resp = test::TestRequest::post()
+            .uri("/")
+            .set_payload("foobar")
+            .send_request(&app)
+            .await;
+
+        assert!(resp.status().is_success());
+
+        let body: CatchallResponse = test::read_body_json(resp).await;
+
+        assert_eq!(body.body.raw, "Zm9vYmFy");
+    }
+
+    #[actix_web::test]
+    async fn test_handler_returns_binary_raw_body_as_base64() {
+        let app = get_test_app().await;
+
+        let resp = test::TestRequest::post()
+            .uri("/")
+            .set_payload(vec![
+                35, 202, 75, 94, 123, 48, 108, 181, 224, 35, 30, 226, 172, 226, 125, 203, 201, 206,
+                88, 83, 172, 201, 188, 96, 30, 244, 44, 65, 6, 199, 135, 93,
+            ])
+            .send_request(&app)
+            .await;
+
+        assert!(resp.status().is_success());
+
+        let body: CatchallResponse = test::read_body_json(resp).await;
+
+        assert_eq!(
+            body.body.raw,
+            "I8pLXnswbLXgIx7irOJ9y8nOWFOsybxgHvQsQQbHh10="
+        );
     }
 }
