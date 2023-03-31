@@ -2,6 +2,7 @@ use actix_web::{middleware, web, App, HttpRequest, HttpServer, Responder, Result
 use env_logger::Env;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 #[derive(Debug, Default, PartialEq, Serialize, Deserialize)]
 struct ClientInfo {
@@ -50,18 +51,15 @@ async fn handler(
 
 fn get_client(request: &HttpRequest) -> ClientInfo {
     let conn_info = request.connection_info();
+    let remote_ip = conn_info.realip_remote_addr().map(|s| s.to_string());
 
-    let host = conn_info.host();
-    let port = host
-        .split(':')
-        .nth(1)
-        .map(|p| p.parse::<u16>().unwrap_or(0))
-        .unwrap_or(0);
+    // Will only return None when called in unit tests unless TestRequest::peer_addr is used.
+    let port = request
+        .peer_addr()
+        .unwrap_or_else(|| SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080))
+        .port();
 
-    ClientInfo {
-        remote_ip: conn_info.realip_remote_addr().map(|s| s.to_string()),
-        port,
-    }
+    ClientInfo { remote_ip, port }
 }
 
 fn get_url_info(request: &HttpRequest) -> UrlInfo {
@@ -139,7 +137,7 @@ mod tests {
             path: "/".to_string(),
             client: ClientInfo {
                 remote_ip: Some("192.168.42.69".to_string()),
-                port: 8080,
+                port: 12345,
             },
             url: UrlInfo {
                 scheme: "http".to_string(),
