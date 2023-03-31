@@ -303,6 +303,7 @@ dependencies = [
 name = "catchall-api"
 version = "0.1.0"
 dependencies = [
+ "actix-http",
  "actix-web",
  "env_logger",
  "parameterized",

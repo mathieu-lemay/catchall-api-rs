@@ -3,10 +3,17 @@ use env_logger::Env;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Default, PartialEq, Serialize, Deserialize)]
+struct ClientInfo {
+    remote_ip: Option<String>,
+    port: u16,
+}
+
+#[derive(Debug, Default, PartialEq, Serialize, Deserialize)]
 struct CatchallResponse {
     method: String,
     path: String,
+    client: ClientInfo,
     query_params: HashMap<String, String>,
 }
 
@@ -14,9 +21,12 @@ async fn handler(
     req: HttpRequest,
     query: web::Query<HashMap<String, String>>,
 ) -> Result<impl Responder> {
+    let client_info = get_client(&req);
+
     let resp = CatchallResponse {
         method: req.method().to_string(),
         path: req.path().to_string(),
+        client: client_info,
         query_params: query.0,
     };
 
@@ -25,6 +35,22 @@ async fn handler(
     println!("{:?}", resp);
 
     Ok(resp)
+}
+
+fn get_client(request: &HttpRequest) -> ClientInfo {
+    let conn_info = request.connection_info();
+
+    let host = conn_info.host();
+    let port = host
+        .split(':')
+        .nth(1)
+        .map(|p| p.parse::<u16>().unwrap_or(0))
+        .unwrap_or(0);
+
+    ClientInfo {
+        remote_ip: conn_info.realip_remote_addr().map(|s| s.to_string()),
+        port,
+    }
 }
 
 fn configure_app(cfg: &mut web::ServiceConfig) {
@@ -52,72 +78,125 @@ async fn main() -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use actix_web::{http::header::ContentType, test};
+    use actix_http::Request;
+    use actix_web::{
+        body::BoxBody,
+        dev::{Service, ServiceResponse},
+        http::header::X_FORWARDED_FOR,
+        test,
+    };
+
+    async fn get_test_app(
+    ) -> impl Service<Request, Response = ServiceResponse<BoxBody>, Error = actix_web::Error> {
+        test::init_service(App::new().configure(configure_app)).await
+    }
 
     #[actix_web::test]
     async fn test_handler_empty_request() {
-        let app = test::init_service(App::new().configure(configure_app)).await;
-        let req = test::TestRequest::default()
-            .insert_header(ContentType::plaintext())
-            .to_request();
+        let app = get_test_app().await;
 
-        let resp: CatchallResponse = test::call_and_read_body_json(&app, req).await;
+        let resp = test::TestRequest::get()
+            .uri("/")
+            .peer_addr("192.168.42.69:12345".parse().unwrap())
+            .send_request(&app)
+            .await;
+
+        assert!(resp.status().is_success());
+
+        let body: CatchallResponse = test::read_body_json(resp).await;
         let expected = CatchallResponse {
             method: "GET".to_string(),
             path: "/".to_string(),
+            client: ClientInfo {
+                remote_ip: Some("192.168.42.69".into()),
+                port: 8080,
+            },
             ..Default::default()
         };
 
-        assert_eq!(resp, expected);
+        assert_eq!(body, expected);
     }
 
     #[actix_web::test]
     async fn test_handler_returns_path() {
-        let app = test::init_service(App::new().configure(configure_app)).await;
-        let req = test::TestRequest::get().uri("/foo/bar?baz=1").to_request();
+        let app = get_test_app().await;
+        let resp = test::TestRequest::get()
+            .uri("/foo/bar?baz=1")
+            .send_request(&app)
+            .await;
 
-        let resp: CatchallResponse = test::call_and_read_body_json(&app, req).await;
-        assert_eq!(resp.path, "/foo/bar".to_string());
+        assert!(resp.status().is_success());
+
+        let body: CatchallResponse = test::read_body_json(resp).await;
+
+        assert_eq!(body.path, "/foo/bar".to_string());
     }
 
     #[actix_web::test]
     async fn test_handler_returns_method() {
-        let app = test::init_service(App::new().configure(configure_app)).await;
+        let app = get_test_app().await;
 
-        let req = test::TestRequest::delete().uri("/").to_request();
-        let resp: CatchallResponse = test::call_and_read_body_json(&app, req).await;
-        assert_eq!(resp.method, "DELETE".to_string());
+        let resp = test::TestRequest::delete()
+            .uri("/")
+            .send_request(&app)
+            .await;
+        let body: CatchallResponse = test::read_body_json(resp).await;
+        assert_eq!(body.method, "DELETE".to_string());
 
-        let req = test::TestRequest::get().uri("/").to_request();
-        let resp: CatchallResponse = test::call_and_read_body_json(&app, req).await;
-        assert_eq!(resp.method, "GET".to_string());
+        let resp = test::TestRequest::patch().uri("/").send_request(&app).await;
+        let body: CatchallResponse = test::read_body_json(resp).await;
+        assert_eq!(body.method, "PATCH".to_string());
 
-        let req = test::TestRequest::patch().uri("/").to_request();
-        let resp: CatchallResponse = test::call_and_read_body_json(&app, req).await;
-        assert_eq!(resp.method, "PATCH".to_string());
+        let resp = test::TestRequest::post().uri("/").send_request(&app).await;
+        let body: CatchallResponse = test::read_body_json(resp).await;
+        assert_eq!(body.method, "POST".to_string());
 
-        let req = test::TestRequest::post().uri("/").to_request();
-        let resp: CatchallResponse = test::call_and_read_body_json(&app, req).await;
-        assert_eq!(resp.method, "POST".to_string());
+        let resp = test::TestRequest::post().uri("/").send_request(&app).await;
+        let body: CatchallResponse = test::read_body_json(resp).await;
+        assert_eq!(body.method, "POST".to_string());
 
-        let req = test::TestRequest::put().uri("/").to_request();
-        let resp: CatchallResponse = test::call_and_read_body_json(&app, req).await;
-        assert_eq!(resp.method, "PUT".to_string());
+        let resp = test::TestRequest::put().uri("/").send_request(&app).await;
+        let body: CatchallResponse = test::read_body_json(resp).await;
+        assert_eq!(body.method, "PUT".to_string());
+    }
+
+    #[actix_web::test]
+    async fn test_handler_returns_real_ip() {
+        let app = get_test_app().await;
+
+        let ip = "192.168.0.1";
+
+        let resp = test::TestRequest::get()
+            .uri("/")
+            .insert_header((X_FORWARDED_FOR, ip))
+            .peer_addr("127.0.0.1:12345".parse().unwrap())
+            .send_request(&app)
+            .await;
+
+        assert!(resp.status().is_success());
+
+        let body: CatchallResponse = test::read_body_json(resp).await;
+
+        assert_eq!(body.client.remote_ip, Some(ip.into()));
     }
 
     #[actix_web::test]
     async fn test_handler_returns_query_params() {
         let app = test::init_service(App::new().configure(configure_app)).await;
 
-        let req = test::TestRequest::get()
+        let resp = test::TestRequest::get()
             .uri("/?foo=bar&baz=69")
-            .to_request();
-        let resp: CatchallResponse = test::call_and_read_body_json(&app, req).await;
+            .send_request(&app)
+            .await;
+
+        assert!(resp.status().is_success());
+
+        let body: CatchallResponse = test::read_body_json(resp).await;
 
         let mut expected = HashMap::new();
         expected.insert("foo".to_string(), "bar".to_string());
         expected.insert("baz".to_string(), "69".to_string());
 
-        assert_eq!(resp.query_params, expected);
+        assert_eq!(body.query_params, expected);
     }
 }
