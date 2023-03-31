@@ -24,6 +24,7 @@ struct CatchallResponse {
     path: String,
     client: ClientInfo,
     url: UrlInfo,
+    headers: HashMap<String, String>,
     query_params: HashMap<String, String>,
 }
 
@@ -33,12 +34,14 @@ async fn handler(
 ) -> Result<impl Responder> {
     let client_info = get_client(&req);
     let url_info = get_url_info(&req);
+    let headers = get_headers(&req);
 
     let resp = CatchallResponse {
         method: req.method().to_string(),
         path: req.path().to_string(),
         client: client_info,
         url: url_info,
+        headers,
         query_params: query.0,
     };
 
@@ -79,6 +82,14 @@ fn get_url_info(request: &HttpRequest) -> UrlInfo {
         port,
         path: request.path().to_string(),
     }
+}
+
+fn get_headers(request: &HttpRequest) -> HashMap<String, String> {
+    request
+        .headers()
+        .iter()
+        .map(|(n, v)| (n.to_string(), v.to_str().unwrap_or("").to_string()))
+        .collect()
 }
 
 fn configure_app(cfg: &mut web::ServiceConfig) {
@@ -132,6 +143,7 @@ mod tests {
         assert!(resp.status().is_success());
 
         let body: CatchallResponse = test::read_body_json(resp).await;
+
         let expected = CatchallResponse {
             method: "GET".to_string(),
             path: "/".to_string(),
@@ -212,6 +224,30 @@ mod tests {
         let body: CatchallResponse = test::read_body_json(resp).await;
 
         assert_eq!(body.client.remote_ip, Some(ip.to_string()));
+    }
+
+    #[actix_web::test]
+    async fn test_handler_returns_headers() {
+        let app = test::init_service(App::new().configure(configure_app)).await;
+
+        let resp = test::TestRequest::get()
+            .uri("/")
+            .insert_header(("Content-Type", "application/json"))
+            .insert_header(("X-Foo", "bar"))
+            .insert_header(("Authorization", "tRoLoLol"))
+            .send_request(&app)
+            .await;
+
+        assert!(resp.status().is_success());
+
+        let body: CatchallResponse = test::read_body_json(resp).await;
+
+        let mut expected = HashMap::new();
+        expected.insert("content-type".to_string(), "application/json".to_string());
+        expected.insert("authorization".to_string(), "tRoLoLol".to_string());
+        expected.insert("x-foo".to_string(), "bar".to_string());
+
+        assert_eq!(body.headers, expected);
     }
 
     #[actix_web::test]
