@@ -153,14 +153,28 @@ mod tests {
         http::header::{ContentType, X_FORWARDED_FOR},
         test,
     };
+    use rstest::*;
 
     async fn get_test_app(
     ) -> impl Service<Request, Response = ServiceResponse<BoxBody>, Error = actix_web::Error> {
         test::init_service(App::new().configure(configure_app)).await
     }
 
+    #[fixture]
+    async fn test_app(
+    ) -> impl Service<Request, Response = ServiceResponse<BoxBody>, Error = actix_web::Error> {
+        test::init_service(App::new().configure(configure_app)).await
+    }
+
+    #[rstest]
     #[actix_web::test]
-    async fn test_handler_empty_request() {
+    async fn test_handler_empty_request(
+        #[future] test_app: impl Service<
+            Request,
+            Response = ServiceResponse<BoxBody>,
+            Error = actix_web::Error,
+        >,
+    ) {
         let app = get_test_app().await;
 
         let resp = test::TestRequest::get()
@@ -207,6 +221,7 @@ mod tests {
         assert_eq!(body.path, "/foo/bar".to_string());
     }
 
+    #[rstest]
     #[actix_web::test]
     async fn test_handler_returns_method() {
         let app = get_test_app().await;
