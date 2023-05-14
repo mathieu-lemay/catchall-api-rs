@@ -1,13 +1,10 @@
 use actix_web::{web, App, HttpRequest, HttpServer, Responder, Result};
 use base64::{engine::general_purpose::STANDARD as b64engine, Engine as _};
 use log::info;
-use logging::init_logger;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-
-mod logging;
 
 #[derive(Debug, Default, PartialEq, Serialize, Deserialize)]
 struct ClientInfo {
@@ -134,8 +131,10 @@ fn configure_app(cfg: &mut web::ServiceConfig) {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    init_logger();
+    log_rs::init();
 
+    // TODO: Add config for host / port
+    info!("Starting server on 0.0.0.0:8080");
     HttpServer::new(|| App::new().configure(configure_app))
         .workers(2)
         .bind(("0.0.0.0", 8080))?

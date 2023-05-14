@@ -306,8 +306,8 @@ dependencies = [
  "actix-http",
  "actix-web",
  "base64",
- "env_logger",
  "log",
+ "log-rs",
  "rstest",
  "serde",
  "serde_json",
@@ -760,6 +760,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "abb12e687cfb44aa40f41fc3978ef76448f9b6038cad6aef4259d3c095a2382e"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "log-rs"
+version = "0.1.0"
+source = "git+ssh://git@gitea.acidrain.duckdns.org:10022/mathieu/log-rs.git#14a0359a88ea58708dad8229025657279d38e244"
+dependencies = [
+ "env_logger",
+ "log",
 ]
 
 [[package]]
