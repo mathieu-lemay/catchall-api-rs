@@ -10,7 +10,7 @@ test:
     cargo test
 
 docker-build:
-    docker build --tag "{{ IMAGE_NAME }}:$(git describe --always HEAD)" .
+    docker build --ssh default --tag "{{ IMAGE_NAME }}:$(git describe --always HEAD)" .
 
 docker-run: docker-build
     docker run --rm -it -p 8080:8080 --name catchall-api-actix "{{ IMAGE_NAME }}:$(git describe --always HEAD)"
