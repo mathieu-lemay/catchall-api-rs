@@ -1,4 +1,4 @@
-use actix_web::{web, App, HttpRequest, HttpServer, Responder, Result};
+use actix_web::{middleware::Logger, web, App, HttpRequest, HttpServer, Responder, Result};
 use base64::{engine::general_purpose::STANDARD as b64engine, Engine as _};
 use config::{Config, ConfigError};
 use log::info;
@@ -156,7 +156,7 @@ async fn main() -> std::io::Result<()> {
         .expect("valid config");
 
     info!("Starting server on {}:{}", settings.host, settings.port);
-    HttpServer::new(|| App::new().configure(configure_app))
+    HttpServer::new(|| App::new().configure(configure_app).wrap(Logger::default()))
         .workers(2)
         .bind((settings.host, settings.port))?
         .run()
