@@ -3,7 +3,7 @@ FROM rust:1.68-slim AS builder
 RUN set -ex; \
     mkdir -p -m 0600 ~/.ssh; \
     apt update && apt install -y --no-install-recommends openssh-client; \
-    ssh-keyscan -p 10022 gitea.acidrain.duckdns.org >> ~/.ssh/known_hosts;
+    echo '[gitea.acidrain.duckdns.org]:10022 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBGH0muaZTfyWOUDLS4kWJtaSISMfAU87zsf68FDLVAYeiPwMjGrYvZX51tXSeeeI3A29LyiPlKsMUuhih/EMA8w=' > ~/.ssh/known_hosts;
 
 WORKDIR /build
 

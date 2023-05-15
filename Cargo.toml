@@ -9,6 +9,7 @@ edition = "2021"
 actix-http = "3.3.1"
 actix-web = "4"
 base64 = "0.21.0"
+config = "0.13.3"
 log = "0.4.17"
 log-rs = { git = "ssh://git@gitea.acidrain.duckdns.org:10022/mathieu/log-rs.git" }
 serde = { version = "1.0", features = ["derive"] }

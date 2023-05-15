@@ -1,5 +1,6 @@
 use actix_web::{web, App, HttpRequest, HttpServer, Responder, Result};
 use base64::{engine::general_purpose::STANDARD as b64engine, Engine as _};
+use config::{Config, ConfigError};
 use log::info;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -129,15 +130,35 @@ fn configure_app(cfg: &mut web::ServiceConfig) {
     );
 }
 
+#[derive(Clone, Debug, Deserialize)]
+struct AppSettings {
+    host: String,
+    port: u16,
+}
+
+fn get_config() -> Result<Config, ConfigError> {
+    let env_source = config::Environment::with_prefix("CATCHALL_API");
+    Ok(Config::builder()
+        .set_default("host", "0.0.0.0")?
+        .set_default("port", 8080)?
+        .add_source(env_source)
+        .build()
+        .unwrap())
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     log_rs::init();
 
-    // TODO: Add config for host / port
-    info!("Starting server on 0.0.0.0:8080");
+    let settings: AppSettings = get_config()
+        .expect("valid config")
+        .try_deserialize()
+        .expect("valid config");
+
+    info!("Starting server on {}:{}", settings.host, settings.port);
     HttpServer::new(|| App::new().configure(configure_app))
         .workers(2)
-        .bind(("0.0.0.0", 8080))?
+        .bind((settings.host, settings.port))?
         .run()
         .await
 }
