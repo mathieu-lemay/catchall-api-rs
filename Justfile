@@ -1,4 +1,5 @@
-IMAGE_NAME := "acidrain/catchall-api-actix"
+PROJECT_NAME := "catchall-api"
+IMAGE_NAME := "acidrain/catchall-api"
 
 run:
     cargo-run
@@ -10,13 +11,13 @@ test:
     cargo test
 
 docker-build:
-    docker build --ssh default --tag "{{ IMAGE_NAME }}:$(git describe --always HEAD)" .
+    docker build --ssh default --tag "$(just docker-tag)" .
 
 docker-run: docker-build
-    docker run --rm -it -p 8080:8080 --name catchall-api-actix "{{ IMAGE_NAME }}:$(git describe --always HEAD)"
+    docker run --rm -it -p 8080:8080 --name "{{ PROJECT_NAME}}" "$(just docker-tag)"
 
 docker-push: docker-build
-    docker push "{{ IMAGE_NAME }}:$(git describe --always HEAD)"
+    docker push "$(just docker-tag)"
 
 @docker-tag:
-    git describe --always HEAD
+    printf "{{ IMAGE_NAME }}:%s\n" "$(git describe --always HEAD)"
