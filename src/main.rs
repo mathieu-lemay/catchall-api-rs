@@ -134,6 +134,7 @@ fn configure_app(cfg: &mut web::ServiceConfig) {
 struct AppSettings {
     host: String,
     port: u16,
+    workers: usize,
 }
 
 fn get_config() -> Result<Config, ConfigError> {
@@ -141,6 +142,7 @@ fn get_config() -> Result<Config, ConfigError> {
     Ok(Config::builder()
         .set_default("host", "0.0.0.0")?
         .set_default("port", 8080)?
+        .set_default("workers", 2)?
         .add_source(env_source)
         .build()
         .unwrap())
@@ -157,7 +159,7 @@ async fn main() -> std::io::Result<()> {
 
     info!("Starting server on {}:{}", settings.host, settings.port);
     HttpServer::new(|| App::new().configure(configure_app).wrap(Logger::default()))
-        .workers(2)
+        .workers(settings.workers)
         .bind((settings.host, settings.port))?
         .run()
         .await
