@@ -2,6 +2,7 @@ use actix_web::{middleware::Logger, web, App, HttpRequest, HttpServer, Responder
 use base64::{engine::general_purpose::STANDARD as b64engine, Engine as _};
 use config::{Config, ConfigError};
 use log::info;
+use log_rs::LogConfig;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -150,7 +151,7 @@ fn get_config() -> Result<Config, ConfigError> {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    log_rs::init();
+    log_rs::init(LogConfig::from_env().expect("Unable to initialize log config from env"));
 
     let settings: AppSettings = get_config()
         .expect("valid config")
