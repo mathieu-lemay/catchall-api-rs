@@ -1,22 +1,20 @@
 [package]
 name = "catchall-api"
 version = "2.0.1"
-edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+edition = "2024"
 
 [dependencies]
 actix-http = "3.3.1"
 actix-web = "4"
 base64 = "0.22.1"
-config = "0.14.1"
+config = "0.15.11"
 log = "0.4.17"
 log-rs = { git = "ssh://git@gitea.acidrain.duckdns.org:10022/mathieu/log-rs.git" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.95"
 
 [dev-dependencies]
-rstest = "0.23.0"
+rstest = "0.25.0"
 
 [profile.release]
 strip="debuginfo"

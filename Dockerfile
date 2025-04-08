@@ -1,4 +1,4 @@
-FROM rust:1.68-slim AS builder
+FROM rust:1.86-slim AS builder
 
 # DL3008: Pin versions in apt get install
 # hadolint ignore=DL3008
