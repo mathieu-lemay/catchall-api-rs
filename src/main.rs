@@ -1,5 +1,5 @@
-use actix_web::{middleware::Logger, web, App, HttpRequest, HttpServer, Responder, Result};
-use base64::{engine::general_purpose::STANDARD as b64engine, Engine as _};
+use actix_web::{App, HttpRequest, HttpServer, Responder, Result, middleware::Logger, web};
+use base64::{Engine as _, engine::general_purpose::STANDARD as b64engine};
 use config::{Config, ConfigError};
 use log::info;
 use log_rs::LogConfig;
@@ -177,8 +177,8 @@ mod tests {
         test,
     };
 
-    async fn get_test_app(
-    ) -> impl Service<Request, Response = ServiceResponse<BoxBody>, Error = actix_web::Error> {
+    async fn get_test_app()
+    -> impl Service<Request, Response = ServiceResponse<BoxBody>, Error = actix_web::Error> {
         test::init_service(App::new().configure(configure_app)).await
     }
 
