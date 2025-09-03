@@ -11,7 +11,7 @@ test:
     cargo test
 
 docker-build:
-    docker build --ssh default --tag "$(just docker-tag)" .
+    docker build --ssh default --network host --tag "$(just docker-tag)" .
 
 docker-run: docker-build
     docker run --rm -it -p 8080:8080 --name "{{ PROJECT_NAME}}" "$(just docker-tag)"
