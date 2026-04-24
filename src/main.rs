@@ -11,6 +11,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 #[derive(Debug, Default, PartialEq, Serialize, Deserialize)]
 struct ClientInfo {
     remote_ip: Option<String>,
+    forwarded_ip: Option<String>,
     port: u16,
 }
 
@@ -75,7 +76,8 @@ async fn handler(
 
 fn get_client(request: &HttpRequest) -> ClientInfo {
     let conn_info = request.connection_info();
-    let remote_ip = conn_info.realip_remote_addr().map(|s| s.to_string());
+    let remote_ip = conn_info.peer_addr().map(|s| s.to_string());
+    let forwarded_ip = conn_info.realip_remote_addr().map(|s| s.to_string());
 
     // Will only return None when called in unit tests unless TestRequest::peer_addr is used.
     let port = request
@@ -83,7 +85,7 @@ fn get_client(request: &HttpRequest) -> ClientInfo {
         .unwrap_or_else(|| SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080))
         .port();
 
-    ClientInfo { remote_ip, port }
+    ClientInfo { remote_ip, forwarded_ip, port }
 }
 
 fn get_url_info(request: &HttpRequest) -> UrlInfo {
@@ -201,6 +203,7 @@ mod tests {
             path: "/".to_string(),
             client: ClientInfo {
                 remote_ip: Some("192.168.42.69".to_string()),
+                forwarded_ip: Some("192.168.42.69".to_string()),
                 port: 12345,
             },
             url: UrlInfo {
@@ -275,7 +278,8 @@ mod tests {
 
         let body: CatchallResponse = test::read_body_json(resp).await;
 
-        assert_eq!(body.client.remote_ip, Some(ip.to_string()));
+        assert_eq!(body.client.remote_ip, Some("127.0.0.1".to_string()));
+        assert_eq!(body.client.forwarded_ip, Some(ip.to_string()));
     }
 
     #[actix_web::test]
