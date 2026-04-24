@@ -1,11 +1,11 @@
-FROM rust:1.86-slim AS builder
+FROM rust:1.93-slim AS builder
 
 # DL3008: Pin versions in apt get install
 # hadolint ignore=DL3008
 RUN set -eu; \
     mkdir -m 0600 ~/.ssh; \
     apt-get update && apt-get install -y --no-install-recommends openssh-client; \
-    echo '[gitea.acidrain.duckdns.org]:10022 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBGH0muaZTfyWOUDLS4kWJtaSISMfAU87zsf68FDLVAYeiPwMjGrYvZX51tXSeeeI3A29LyiPlKsMUuhih/EMA8w=' > ~/.ssh/known_hosts;
+    echo '[git.mathieulemay.net]:10022 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGDY5VoFZftqSCpIfFesQi9riUyl9NHoP8ggThlsAmRJ' > ~/.ssh/known_hosts;
 
 WORKDIR /build
 
